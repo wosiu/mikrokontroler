@@ -94,6 +94,7 @@ void confLED() {
 void confUSART() {
 	RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
 	//RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 	
 	// Konfigurujemy linie TXD
 	GPIOafConfigure(GPIOA,
@@ -133,6 +134,7 @@ void confUSART() {
 
 char getcBocking() {
 	// todo
+	return 'a';
 }
 
 void putcBlocking(char c) {
@@ -148,24 +150,23 @@ int main() {
 	confLED();
 
 	for (;;) {
-		putcBlocking("a");
-		Delay(4000000);
-	}
-	/*
-	for (;;) {
 		RedLEDon();
 		Delay(4000000);
+		
+		putcBlocking('a');
+
 		RedLEDoff();
+
 		GreenLEDon();
 		Delay(4000000);
 		GreenLEDoff();
 		BlueLEDon();
 		Delay(4000000);
 		BlueLEDoff();
-		Green2LEDon();
-		Delay(4000000);
-		Green2LEDoff();
-	}*/
+		//Green2LEDon();
+		//Delay(4000000);
+		//Green2LEDoff();
+	}
 	
 	return 0;
 }
