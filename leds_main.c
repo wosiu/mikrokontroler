@@ -25,7 +25,8 @@
 #define Green2LEDoff() GREEN2_LED_GPIO->BSRRH = 1 << GREEN2_LED_PIN
 
 void confLED() {
-		RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
+	// Włącz taktowanie
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
 	
 	__NOP();
 	RedLEDoff();
@@ -94,6 +95,7 @@ void confLED() {
 void confUSART() {
 	RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
 	//RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+	// Wlacz taktowanie
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 	
 	// Konfigurujemy linie TXD
@@ -130,6 +132,32 @@ void confUSART() {
 }
 
 
+// ============================= BUTTONS ============================
+
+#define USER_BUTTON_GPIO GPIOC
+#define USER_BUTTON_PIN 13
+#define JOYSTICK_GPIO GPIOB
+#define JOYSTICK_UP_PIN 5
+#define JOYSTICK_DOWN_PIN 6
+#define JOYSTICK_LEFT_PIN 3
+#define JOYSTICK_RIGHT_PIN 4
+#define JOYSTICK_ACTION 10
+#define USER_BUTTON_GPIO GPIOA
+#define USER_BUTTON_PIN 0
+
+#define leftPressed() (JOYSTICK_GPIO->IDR & (1 << JOYSTICK_LEFT_PIN))
+
+
+
+void confButtons() {
+	// Włącz taktowanie
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | 
+		RCC_AHB1ENR_GPIOBEN | 
+		RCC_AHB1ENR_GPIOCEN; 
+		
+}
+
+
 // ============================= UTILS ===============================
 
 char getcBocking() {
@@ -137,8 +165,11 @@ char getcBocking() {
 	return 'a';
 }
 
+#define CAN_WRITE (USART2->SR & USART_SR_TXE)
+#define HAS_NEXT_CHAR (USART2->SR & USART_SR_RXNE)
+
 void putcBlocking(char c) {
-	for (;!(USART2->SR & USART_SR_TXE);) {
+	for (;!CAN_WRITE;) {
 		__NOP();	
 	}
 	USART2->DR = c;
