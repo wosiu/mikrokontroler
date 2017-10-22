@@ -1,8 +1,12 @@
 #include <delay.h>
 #include <gpio.h>
 #include <stm32.h>
+// TODO remove! added only to support functions and macros recognition in IDE
+#include <stm32f411xe.h>
+
 
 // ============================ LEDY ===================================
+
 #define RED_LED_GPIO GPIOA
 #define GREEN_LED_GPIO GPIOA
 #define BLUE_LED_GPIO GPIOB
@@ -27,7 +31,7 @@
 void confLED() {
 	// Włącz taktowanie
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
-	
+
 	__NOP();
 	RedLEDoff();
 	GreenLEDoff();
@@ -40,7 +44,7 @@ void confLED() {
 		GPIO_Low_Speed,
 		GPIO_PuPd_NOPULL
 	);
-	
+
 	GPIOoutConfigure(GREEN_LED_GPIO,
 		GREEN_LED_PIN,
 		GPIO_OType_PP,
@@ -54,7 +58,7 @@ void confLED() {
 		GPIO_Low_Speed,
 		GPIO_PuPd_NOPULL
 	);
-	
+
 	GPIOoutConfigure(GREEN2_LED_GPIO,
 		GREEN2_LED_PIN,
 		GPIO_OType_PP,
@@ -63,7 +67,9 @@ void confLED() {
 	);
 }
 
+
 // =========================== UART ====================================
+
 // Tryb pracy
 #define USART_Mode_Rx_Tx (USART_CR1_RE | USART_CR1_TE)
 #define USART_Enable USART_CR1_UE
@@ -97,7 +103,7 @@ void confUSART() {
 	//RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
 	// Wlacz taktowanie
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
-	
+
 	// Konfigurujemy linie TXD
 	GPIOafConfigure(GPIOA,
 		2,
@@ -106,7 +112,7 @@ void confUSART() {
 		GPIO_PuPd_NOPULL,
 		GPIO_AF_USART2
 	);
-	
+
 	// Konfigurujemy linię RXD
 	GPIOafConfigure(GPIOA,
 		3,
@@ -115,13 +121,13 @@ void confUSART() {
 		GPIO_PuPd_UP,
 		GPIO_AF_USART2
 	);
-	
+
 	USART2->CR1 = USART_Mode_Rx_Tx |
 		USART_WordLength_8b |
 		USART_Parity_No;
-	
+
 	USART2->CR2 = USART_StopBits_1;
-	
+
 	USART2->CR3 = USART_FlowControl_None;
 
 	// I Przykładowa konfiguracja
@@ -134,43 +140,73 @@ void confUSART() {
 
 // ============================= BUTTONS ============================
 
+// czytanka: https://www.mimuw.edu.pl/~marpe/mikrokontrolery/w2_gpio.pdf
+
+// stan aktywny niski – logiczne 0
 #define USER_BUTTON_GPIO GPIOC
 #define USER_BUTTON_PIN 13
+// stan aktywny niski – logiczne 0
 #define JOYSTICK_GPIO GPIOB
 #define JOYSTICK_UP_PIN 5
 #define JOYSTICK_DOWN_PIN 6
 #define JOYSTICK_LEFT_PIN 3
 #define JOYSTICK_RIGHT_PIN 4
-#define JOYSTICK_ACTION 10
-#define USER_BUTTON_GPIO GPIOA
-#define USER_BUTTON_PIN 0
+#define JOYSTICK_FIRE_PIN 10
+// stan aktywny wysoki – logiczna 1
+#define MODE_BUTTON_GPIO GPIOA
+#define MODE_BUTTON_PIN 0
 
-#define leftPressed() (JOYSTICK_GPIO->IDR & (1 << JOYSTICK_LEFT_PIN))
+#define UserButtonPressed() (!(USER_BUTTON_GPIO->IDR & (1 << USER_BUTTON_PIN)))
+#define JoystickPressed(pin) (!(JOYSTICK_GPIO->IDR & (1 << pin)))
+#define LeftPressed()  JoystickPressed(JOYSTICK_LEFT_PIN)
+#define RightPressed() JoystickPressed(JOYSTICK_RIGHT_PIN)
+#define UpPressed()    JoystickPressed(JOYSTICK_UP_PIN)
+#define DownPressed()  JoystickPressed(JOYSTICK_DOWN_PIN)
+#define FirePressed()  JoystickPressed(JOYSTICK_FIRE_PIN)
+#define ModeButtonPressed() (MODE_BUTTON_GPIO->IDR & (1 << MODE_BUTTON_PIN))
 
 
+void confInput(GPIO_TypeDef * const gpio, uint32_t pin) {
+    GPIOainConfigure(gpio, pin);
+//                    ?,   // GPIOPuPd_TypeDef pull,
+//                    ?,   // EXTIMode_TypeDef mode,
+//                    ?    // EXTITrigger_TypeDef trigger);
+}
 
 void confButtons() {
-	// Włącz taktowanie
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | 
-		RCC_AHB1ENR_GPIOBEN | 
-		RCC_AHB1ENR_GPIOCEN; 
-		
+    // Włącz taktowanie
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN |
+                    RCC_AHB1ENR_GPIOBEN |
+                    RCC_AHB1ENR_GPIOCEN;
+
+    confInput(USER_BUTTON_GPIO, USER_BUTTON_PIN);
+
+    confInput(JOYSTICK_GPIO,    JOYSTICK_UP_PIN);
+    confInput(JOYSTICK_GPIO,    JOYSTICK_DOWN_PIN);
+    confInput(JOYSTICK_GPIO,    JOYSTICK_LEFT_PIN);
+    confInput(JOYSTICK_GPIO,    JOYSTICK_RIGHT_PIN);
+    confInput(JOYSTICK_GPIO,    JOYSTICK_FIRE_PIN);
+
+    confInput(MODE_BUTTON_GPIO, MODE_BUTTON_PIN);
 }
 
 
 // ============================= UTILS ===============================
+#define CAN_WRITE (USART2->SR & USART_SR_TXE)
+#define HAS_NEXT_CHAR (USART2->SR & USART_SR_RXNE)
 
-char getcBocking() {
+
+char getcActiveWait() {
+	for (;!HAS_NEXT_CHAR;) {
+		__NOP();
+	}
 	// todo
 	return 'a';
 }
 
-#define CAN_WRITE (USART2->SR & USART_SR_TXE)
-#define HAS_NEXT_CHAR (USART2->SR & USART_SR_RXNE)
-
-void putcBlocking(char c) {
+void putcActiveWait(char c) {
 	for (;!CAN_WRITE;) {
-		__NOP();	
+		__NOP();
 	}
 	USART2->DR = c;
 }
@@ -179,12 +215,13 @@ void putcBlocking(char c) {
 int main() {
 	confUSART();
 	confLED();
+    confButtons();
 
 	for (;;) {
 		RedLEDon();
 		Delay(4000000);
-		
-		putcBlocking('a');
+
+        putcActiveWait('a');
 
 		RedLEDoff();
 
@@ -198,7 +235,7 @@ int main() {
 		//Delay(4000000);
 		//Green2LEDoff();
 	}
-	
+
 	return 0;
 }
 
