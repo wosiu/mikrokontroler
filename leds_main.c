@@ -208,8 +208,9 @@ char getcActiveWait() {
 	for (;!HAS_NEXT_CHAR;) {
 		__NOP();
 	}
-	// todo
-	return 'a';
+    char c;
+    c = USART2->DR;
+    return c;
 }
 
 void putcActiveWait(char c) {
