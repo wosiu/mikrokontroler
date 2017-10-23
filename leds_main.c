@@ -252,7 +252,7 @@ void uartPutc(char c) {
 
 // ====================== SIMPLE QUE IMPLEMENTATION =========================
 
-#define Q_SIZE 50
+#define Q_SIZE 64
 
 #include <stdio.h>
 #include <string.h>
@@ -262,47 +262,74 @@ typedef struct {
     int begin, end;
 } Que;
 
-int clear(Que *q) {
+void clear(Que *q) {
     q->begin = q->end = 0;
 }
 
-int available(const Que *q) {
-
+int size(const Que *q) {
+    return ((q->end + Q_SIZE) - q->begin) % Q_SIZE;
 }
 
-int size(const Que *q) {
-
+int available(const Que *q) {
+    return Q_SIZE - 1 - size(q);
 }
 
 bool isEmpty(const Que *q) {
     return q->begin == q->end;
 }
 
-bool isFull(const Que *q) {
-//    return
-}
-
 bool startsWith(const Que *q, char* str) {
     int len = strlen(str);
-    return 0;
+    if (size(q) < len) {
+        return false;
+    }
+    int j = q->begin;
+    for (int i = 0; i < len; i++) {
+        if (q->buf[j] != str[i]) {
+            return false;
+        }
+        j = (j + 1) % Q_SIZE;
+    }
+    return true;
 }
 
-void pushChar(Que *q, char c) {
-
+bool pushChar(Que *q, char c) {
+    if (available(q) == 0) {
+        return false;
+    }
+    int j = q->end;
+    q->buf[j] = c;
+    q->end = (j + 1) % Q_SIZE;
+    return true;
 }
 
-void pushStr(Que *q, char* command) {
-    // len x pushChar
+bool pushStr(Que *q, char* command) {
+    int len = strlen(command);
+    if (available(q) < len) {
+        // not enough space to put a command
+        return false;
+    }
+    for (int i = 0; i < len; i++) {
+        pushChar(q, command[i]);
+    }
+    return false;
 }
-
 
 char popFront(Que *q) {
-    return ' ';
+    int j = q->begin;
+    char c = q->buf[j];
+    q->begin = (j + 1) % Q_SIZE;
+    return c;
 }
 
 // returns true if found
-bool popFrontIfEqual(const Que *q, char *str) {
-    // combine startsWith and len x popFront
+bool popFrontIfEqual(Que *q, char *str) {
+    if (!startsWith(q, str)) {
+        return false;
+    }
+    int len = strlen(str);
+    q->begin = (q->begin + len) % Q_SIZE;
+    return true;
 }
 
 void buttonChange(GPIO_TypeDef * gpio, uint32_t pin, int active, char* name, Que *q) {
@@ -343,6 +370,9 @@ int main() {
         }
 
         if (!isEmpty(&in_q)) {
+            popFrontIfEqual(&in_q, " ");
+//            popFrontIfEqual(&in_q, "\n");
+
             if (popFrontIfEqual(&in_q, "LED 1 ON")) {
                 RedLEDon();
             } else if (popFrontIfEqual(&in_q, "LED 1 OFF")) {
