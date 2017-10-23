@@ -29,6 +29,16 @@
 #define Green2LEDon() GREEN2_LED_GPIO->BSRRL = 1 << GREEN2_LED_PIN
 #define Green2LEDoff() GREEN2_LED_GPIO->BSRRH = 1 << GREEN2_LED_PIN
 
+
+void GPIOconfLED(GPIO_TypeDef * const gpio, uint32_t pin) {
+    GPIOoutConfigure(gpio,
+                     pin,
+                     GPIO_OType_PP,
+                     GPIO_Low_Speed,
+                     GPIO_PuPd_NOPULL
+    );
+}
+
 void confLED() {
 	// Włącz taktowanie
 	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
@@ -37,35 +47,12 @@ void confLED() {
 	RedLEDoff();
 	GreenLEDoff();
 	BlueLEDoff();
-	Green2LEDoff();
+    Green2LEDoff();
 
-	GPIOoutConfigure(RED_LED_GPIO,
-		RED_LED_PIN,
-		GPIO_OType_PP,
-		GPIO_Low_Speed,
-		GPIO_PuPd_NOPULL
-	);
-
-	GPIOoutConfigure(GREEN_LED_GPIO,
-		GREEN_LED_PIN,
-		GPIO_OType_PP,
-		GPIO_Low_Speed,
-		GPIO_PuPd_NOPULL
-	);
-
-	GPIOoutConfigure(BLUE_LED_GPIO,
-		BLUE_LED_PIN,
-		GPIO_OType_PP,
-		GPIO_Low_Speed,
-		GPIO_PuPd_NOPULL
-	);
-
-	GPIOoutConfigure(GREEN2_LED_GPIO,
-		GREEN2_LED_PIN,
-		GPIO_OType_PP,
-		GPIO_Low_Speed,
-		GPIO_PuPd_NOPULL
-	);
+    GPIOconfLED(RED_LED_GPIO,    RED_LED_PIN);
+    GPIOconfLED(GREEN_LED_GPIO,  GREEN_LED_PIN);
+    GPIOconfLED(BLUE_LED_GPIO,   BLUE_LED_PIN);
+    GPIOconfLED(GREEN2_LED_GPIO, GREEN2_LED_PIN);
 }
 
 
@@ -146,6 +133,9 @@ void confUSART() {
 // stan aktywny niski – logiczne 0
 #define USER_BUTTON_GPIO GPIOC
 #define USER_BUTTON_PIN 13
+// stan aktywny wysoki – logiczna 1
+#define MODE_BUTTON_GPIO GPIOA
+#define MODE_BUTTON_PIN 0
 // stan aktywny niski – logiczne 0
 #define JOYSTICK_GPIO GPIOB
 #define JOYSTICK_UP_PIN 5
@@ -153,21 +143,32 @@ void confUSART() {
 #define JOYSTICK_LEFT_PIN 3
 #define JOYSTICK_RIGHT_PIN 4
 #define JOYSTICK_FIRE_PIN 10
-// stan aktywny wysoki – logiczna 1
-#define MODE_BUTTON_GPIO GPIOA
-#define MODE_BUTTON_PIN 0
 
 #define UserButtonPressed() (!(USER_BUTTON_GPIO->IDR & (1 << USER_BUTTON_PIN)))
+
+#define ModeButtonPressed() (MODE_BUTTON_GPIO->IDR & (1 << MODE_BUTTON_PIN))
+
 #define JoystickPressed(pin) (!(JOYSTICK_GPIO->IDR & (1 << pin)))
 #define LeftPressed()  JoystickPressed(JOYSTICK_LEFT_PIN)
 #define RightPressed() JoystickPressed(JOYSTICK_RIGHT_PIN)
 #define UpPressed()    JoystickPressed(JOYSTICK_UP_PIN)
 #define DownPressed()  JoystickPressed(JOYSTICK_DOWN_PIN)
 #define FirePressed()  JoystickPressed(JOYSTICK_FIRE_PIN)
-#define ModeButtonPressed() (MODE_BUTTON_GPIO->IDR & (1 << MODE_BUTTON_PIN))
+
+// experimental :
+//const uint32_t buttonPIN[7] = {USER_BUTTON_PIN, MODE_BUTTON_PIN, JOYSTICK_UP_PIN, JOYSTICK_DOWN_PIN, JOYSTICK_LEFT_PIN, JOYSTICK_RIGHT_PIN, JOYSTICK_FIRE_PIN};
+//const GPIO_TypeDef * buttonGPIO[7] = {GPIOC, GPIOA, GPIOB, GPIOB, GPIOB, GPIOB, GPIOB};
+//const char* consoleText[2][7] = {
+//        {"USER PRESSED", "MODE PRESSED", "UP PRESSED", "DOWN PRESSED", "LEFT PRESSED", "RIGHT PRESSED", "FIRE PRESSED"},
+//        {"USER RELEASED", "MODE RELEASED", "UP RELEASED", "DOWN RELEASED", "LEFT RELEASED", "RIGHT RELEASED", "FIRE RELEASED"}
+//};
+//const char buttonActive[7] = {0, 1, 0, 0, 0, 0, 0};
+//char previousState[7] = {0, 0, 0, 0, 0, 0, 0};
+// -----------------
 
 
-void confInput(GPIO_TypeDef * const gpio, uint32_t pin) {
+
+void GPIOconfButton(GPIO_TypeDef *const gpio, uint32_t pin) {
     // TODO czym sie to rozni od GPIOinConfigure i ktorego uzwac
     GPIOainConfigure(gpio, pin);
 //                    ?,   // GPIOPuPd_TypeDef pull,
@@ -181,15 +182,15 @@ void confButtons() {
                     RCC_AHB1ENR_GPIOBEN |
                     RCC_AHB1ENR_GPIOCEN;
 
-    confInput(USER_BUTTON_GPIO, USER_BUTTON_PIN);
+    GPIOconfButton(USER_BUTTON_GPIO, USER_BUTTON_PIN);
 
-    confInput(JOYSTICK_GPIO,    JOYSTICK_UP_PIN);
-    confInput(JOYSTICK_GPIO,    JOYSTICK_DOWN_PIN);
-    confInput(JOYSTICK_GPIO,    JOYSTICK_LEFT_PIN);
-    confInput(JOYSTICK_GPIO,    JOYSTICK_RIGHT_PIN);
-    confInput(JOYSTICK_GPIO,    JOYSTICK_FIRE_PIN);
+    GPIOconfButton(JOYSTICK_GPIO, JOYSTICK_UP_PIN);
+    GPIOconfButton(JOYSTICK_GPIO, JOYSTICK_DOWN_PIN);
+    GPIOconfButton(JOYSTICK_GPIO, JOYSTICK_LEFT_PIN);
+    GPIOconfButton(JOYSTICK_GPIO, JOYSTICK_RIGHT_PIN);
+    GPIOconfButton(JOYSTICK_GPIO, JOYSTICK_FIRE_PIN);
 
-    confInput(MODE_BUTTON_GPIO, MODE_BUTTON_PIN);
+    GPIOconfButton(MODE_BUTTON_GPIO, MODE_BUTTON_PIN);
 }
 
 // i'th bit says what was previous pressed/released state of a button with pin i,
@@ -241,9 +242,6 @@ typedef struct {
     int begin, end;
 } Que;
 
-Que out_q;
-Que in_q;
-
 int available(const Que *q) {
 
 }
@@ -283,16 +281,13 @@ bool removeIfEqual(const Que *q, char* str, int len) {
 }
 
 
-
-#include <stdio.h>
-#include <string.h>
-
 int main() {
 	confUSART();
 	confLED();
     confButtons();
 
-    char tmp[30] = "LED 1 ON\nLED 2 OFF\n";
+    Que out_q;
+    Que in_q;
 
     // todo implement for
     // implement buttons, write whatever to console, keep leds blinkig
