@@ -1,10 +1,11 @@
-#include <delay.h>
 #include <gpio.h>
-#include <stm32.h>
-// TODO remove! added only to support functions and macros recognition in IDE
+//#include <stm32.h>
+// normally should use above which is in this case resolved to the following
+// added here to support functions and macros recognition in IDE
 #include <stm32f411xe.h>
 #include <stdbool.h>
-
+#include <string.h>
+//#include <delay.h>
 
 // ============================ LEDY ===================================
 
@@ -122,7 +123,7 @@ void confUSART() {
 
 	USART2->CR3 = USART_FlowControl_None;
 
-	// I Przykładowa konfiguracja
+	// Przykładowa konfiguracja
 	uint32_t const baudrate = 9600U;
 	USART2->BRR = (PCLK1_HZ + (baudrate / 2U)) / baudrate;
 
@@ -151,37 +152,13 @@ void confUSART() {
 #define JOYSTICK_ACTIVE 0
 
 // i'th bit says what was previous pressed/released state of a button with pin i,
-// we can rely on it as long as pins  for buttons are unique
+// we can rely on it as long as pins for buttons are unique
 int BUTTON_STATE = 0;
 
 #define PrevButtonState(pin) ((BUTTON_STATE & (1<<pin)) != 0)
 #define IsButtonPressed(gpio, pin, active) (((gpio->IDR & (1 << pin)) != 0) == active)
 #define HasButtonChanged(gpio, pin, active) (IsButtonPressed(gpio, pin, active) != PrevButtonState(pin))
 #define RevertButtonState(pin) BUTTON_STATE ^= (1 << pin)
-
-
-
-//#define UserButtonPressed() (!(USER_BUTTON_GPIO->IDR & (1 << USER_BUTTON_PIN)))
-//#define ModeButtonPressed() (MODE_BUTTON_GPIO->IDR & (1 << MODE_BUTTON_PIN))
-//#define JoystickPressed(pin) (!(JOYSTICK_GPIO->IDR & (1 << pin)))
-//#define LeftPressed()  JoystickPressed(JOYSTICK_LEFT_PIN)
-//#define RightPressed() JoystickPressed(JOYSTICK_RIGHT_PIN)
-//#define UpPressed()    JoystickPressed(JOYSTICK_UP_PIN)
-//#define DownPressed()  JoystickPressed(JOYSTICK_DOWN_PIN)
-//#define FirePressed()  JoystickPressed(JOYSTICK_FIRE_PIN)
-
-
-// experimental :
-//const uint32_t buttonPIN[7] = {USER_BUTTON_PIN, MODE_BUTTON_PIN, JOYSTICK_UP_PIN, JOYSTICK_DOWN_PIN, JOYSTICK_LEFT_PIN, JOYSTICK_RIGHT_PIN, JOYSTICK_FIRE_PIN};
-//const GPIO_TypeDef * buttonGPIO[7] = {GPIOC, GPIOA, GPIOB, GPIOB, GPIOB, GPIOB, GPIOB};
-//const char* consoleText[2][7] = {
-//        {"USER PRESSED", "MODE PRESSED", "UP PRESSED", "DOWN PRESSED", "LEFT PRESSED", "RIGHT PRESSED", "FIRE PRESSED"},
-//        {"USER RELEASED", "MODE RELEASED", "UP RELEASED", "DOWN RELEASED", "LEFT RELEASED", "RIGHT RELEASED", "FIRE RELEASED"}
-//};
-//const char buttonActive[7] = {0, 1, 0, 0, 0, 0, 0};
-//char previousState[7] = {0, 0, 0, 0, 0, 0, 0};
-// -----------------
-
 
 
 void GPIOconfButton(GPIO_TypeDef *const gpio, uint32_t pin) {
@@ -202,8 +179,12 @@ void confButtons() {
 
     // todo spytac czy musze to robic tak jak resetowalem LEDy
     USER_BUTTON_GPIO->BSRRH = 1 << USER_BUTTON_PIN;
-    JOYSTICK_GPIO->BSRRL = (1 << JOYSTICK_UP_PIN) | (1 << JOYSTICK_DOWN_PIN) | (1 << JOYSTICK_LEFT_PIN) |
-            (1 << JOYSTICK_RIGHT_PIN) | (1 << JOYSTICK_FIRE_PIN);
+    JOYSTICK_GPIO->BSRRL =
+            (1 << JOYSTICK_UP_PIN) |
+            (1 << JOYSTICK_DOWN_PIN) |
+            (1 << JOYSTICK_LEFT_PIN) |
+            (1 << JOYSTICK_RIGHT_PIN) |
+            (1 << JOYSTICK_FIRE_PIN);
     MODE_BUTTON_GPIO->BSRRH = 1 << MODE_BUTTON_PIN;
 
     GPIOconfButton(USER_BUTTON_GPIO, USER_BUTTON_PIN);
@@ -222,22 +203,6 @@ void confButtons() {
 #define CAN_WRITE (USART2->SR & USART_SR_TXE)
 #define HAS_NEXT_CHAR (USART2->SR & USART_SR_RXNE)
 
-char getcActiveWait() {
-	for (;!HAS_NEXT_CHAR;) {
-		__NOP();
-	}
-    char c;
-    c = USART2->DR;
-    return c;
-}
-
-void putcActiveWait(char c) {
-    for (;!CAN_WRITE;) {
-        __NOP();
-    }
-    USART2->DR = c;
-}
-
 char uartGetc() {
     char c;
     c = USART2->DR;
@@ -252,9 +217,6 @@ void uartPutc(char c) {
 // ====================== SIMPLE QUE IMPLEMENTATION =========================
 
 #define Q_SIZE 64
-
-#include <stdio.h>
-#include <string.h>
 
 typedef struct {
     char buf[Q_SIZE];
@@ -359,7 +321,6 @@ int main() {
     clear(&out_q);
     clear(&in_q);
 
-
 	for (;;) {
         if (HAS_NEXT_CHAR && available(&in_q) > 0 ) {
             char c = uartGetc();
@@ -367,6 +328,7 @@ int main() {
             pushChar(&out_q, c); // to see in console what typing
         }
 
+        // process commands
         if (!isEmpty(&in_q)) {
             popFrontIfEqual(&in_q, " ");
 
@@ -397,6 +359,7 @@ int main() {
             }
         }
 
+        // process buttons
         buttonChange(MODE_BUTTON_GPIO, MODE_BUTTON_PIN, MODE_BUTTON_ACTIVE, "MODE", &out_q);
         buttonChange(USER_BUTTON_GPIO, USER_BUTTON_PIN, USER_BUTTON_ACTIVE, "USER", &out_q);
         buttonChange(JOYSTICK_GPIO, JOYSTICK_UP_PIN, JOYSTICK_ACTIVE, "UP", &out_q);
@@ -409,8 +372,6 @@ int main() {
             uartPutc(popFront(&out_q));
         }
 	}
-
-	return 0;
 }
 
 
