@@ -160,7 +160,7 @@ void confUSART() {
 #define UserButtonPressed() (!(USER_BUTTON_GPIO->IDR & (1 << USER_BUTTON_PIN)))
 #define JoystickPressed(pin) (!(JOYSTICK_GPIO->IDR & (1 << pin)))
 #define LeftPressed()  JoystickPressed(JOYSTICK_LEFT_PIN)
-#define RightPressed() JoystickPressed(JOYSTgetcBockingICK_RIGHT_PIN)
+#define RightPressed() JoystickPressed(JOYSTICK_RIGHT_PIN)
 #define UpPressed()    JoystickPressed(JOYSTICK_UP_PIN)
 #define DownPressed()  JoystickPressed(JOYSTICK_DOWN_PIN)
 #define FirePressed()  JoystickPressed(JOYSTICK_FIRE_PIN)
@@ -192,13 +192,12 @@ void confButtons() {
     confInput(MODE_BUTTON_GPIO, MODE_BUTTON_PIN);
 }
 
-// todo spytac czy to mamy obslugiwac, czy moze ma w kolko wypisywac ze wcisniety tak dlugo jak wcisniety
 // i'th bit says what was previous pressed/released state of a button with pin i,
 // we can rely on it as long as pins  for buttons are unique
 int BUTTON_STATE = 0;
 #define prevButtonState(pin) (BUTTON_STATE & (1<<pin))
 #define hasButtonStateChanged(pin, is_active) ((prevButtonState(pin) == 0) != (is_active == 0))
-
+#define revertButtonState(pin) (BUTTON_STATE ^= (1<<pin))
 
 // ============================= UTILS ===============================
 
@@ -244,7 +243,6 @@ typedef struct {
 
 Que out_q;
 Que in_q;
-
 
 int available(const Que *q) {
 
@@ -296,9 +294,11 @@ int main() {
 
     char tmp[30] = "LED 1 ON\nLED 2 OFF\n";
 
-    if(strncmp(tmp, "LED", 3)) {
-        BlueLEDon();
-    }
+    // todo implement for
+    // implement buttons, write whatever to console, keep leds blinkig
+    // implement out
+    // implement in
+    // implement leds
 
 	for (;;) {
 		RedLEDon();
