@@ -301,10 +301,8 @@ void buttonChange(GPIO_TypeDef * gpio, uint32_t pin, int active, char* name, Que
         pushStr(q, name);
         if (IsButtonPressed(gpio, pin, active)) {
             pushStr(q, " PRESSED ");
-//            putcActiveWait('P');
         } else {
             pushStr(q, " RELEASED ");
-//            putcActiveWait('R');
         }
         RevertButtonState(pin);
     }
