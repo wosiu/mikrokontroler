@@ -19,15 +19,19 @@
 
 #define RedLEDon()  RED_LED_GPIO->BSRRH = 1 << RED_LED_PIN
 #define RedLEDoff() RED_LED_GPIO->BSRRL = 1 << RED_LED_PIN
+#define RedLEDtoggle() RED_LED_GPIO->ODR ^= 1 << RED_LED_PIN
 
 #define GreenLEDon() GREEN_LED_GPIO->BSRRH = 1 << GREEN_LED_PIN
 #define GreenLEDoff() GREEN_LED_GPIO->BSRRL = 1 << GREEN_LED_PIN
+#define GreenLEDtoggle() GREEN_LED_GPIO->ODR ^= 1 << RED_LED_PIN
 
 #define BlueLEDon() BLUE_LED_GPIO->BSRRH = 1 << BLUE_LED_PIN
 #define BlueLEDoff() BLUE_LED_GPIO->BSRRL = 1 << BLUE_LED_PIN
+#define BlueLEDtoggle() BLUE_LED_GPIO->ODR ^= 1 << RED_LED_PIN
 
 #define Green2LEDon() GREEN2_LED_GPIO->BSRRL = 1 << GREEN2_LED_PIN
 #define Green2LEDoff() GREEN2_LED_GPIO->BSRRH = 1 << GREEN2_LED_PIN
+#define Green2LEDtoggle() GREEN2_LED_GPIO->ODR ^= 1 << RED_LED_PIN
 
 
 void GPIOconfLED(GPIO_TypeDef * const gpio, uint32_t pin) {
@@ -130,30 +134,42 @@ void confUSART() {
 
 // czytanka: https://www.mimuw.edu.pl/~marpe/mikrokontrolery/w2_gpio.pdf
 
-// stan aktywny niski – logiczne 0
 #define USER_BUTTON_GPIO GPIOC
 #define USER_BUTTON_PIN 13
-// stan aktywny wysoki – logiczna 1
+#define USER_BUTTON_ACTIVE 0
+
 #define MODE_BUTTON_GPIO GPIOA
 #define MODE_BUTTON_PIN 0
-// stan aktywny niski – logiczne 0
+#define MODE_BUTTON_ACTIVE 1
+
 #define JOYSTICK_GPIO GPIOB
 #define JOYSTICK_UP_PIN 5
 #define JOYSTICK_DOWN_PIN 6
 #define JOYSTICK_LEFT_PIN 3
 #define JOYSTICK_RIGHT_PIN 4
 #define JOYSTICK_FIRE_PIN 10
+#define JOYSTICK_ACTIVE 0
 
-#define UserButtonPressed() (!(USER_BUTTON_GPIO->IDR & (1 << USER_BUTTON_PIN)))
+// i'th bit says what was previous pressed/released state of a button with pin i,
+// we can rely on it as long as pins  for buttons are unique
+int BUTTON_STATE = 0;
 
-#define ModeButtonPressed() (MODE_BUTTON_GPIO->IDR & (1 << MODE_BUTTON_PIN))
+#define PrevButtonState(pin) ((BUTTON_STATE & (1<<pin)) != 0)
+#define IsButtonPressed(gpio, pin, active) (((gpio->IDR & (1 << pin)) != 0) == active)
+#define HasButtonChanged(gpio, pin, active) (IsButtonPressed(gpio, pin, active) != PrevButtonState(pin))
+#define RevertButtonState(pin) BUTTON_STATE ^= (1 << pin)
 
-#define JoystickPressed(pin) (!(JOYSTICK_GPIO->IDR & (1 << pin)))
-#define LeftPressed()  JoystickPressed(JOYSTICK_LEFT_PIN)
-#define RightPressed() JoystickPressed(JOYSTICK_RIGHT_PIN)
-#define UpPressed()    JoystickPressed(JOYSTICK_UP_PIN)
-#define DownPressed()  JoystickPressed(JOYSTICK_DOWN_PIN)
-#define FirePressed()  JoystickPressed(JOYSTICK_FIRE_PIN)
+
+
+//#define UserButtonPressed() (!(USER_BUTTON_GPIO->IDR & (1 << USER_BUTTON_PIN)))
+//#define ModeButtonPressed() (MODE_BUTTON_GPIO->IDR & (1 << MODE_BUTTON_PIN))
+//#define JoystickPressed(pin) (!(JOYSTICK_GPIO->IDR & (1 << pin)))
+//#define LeftPressed()  JoystickPressed(JOYSTICK_LEFT_PIN)
+//#define RightPressed() JoystickPressed(JOYSTICK_RIGHT_PIN)
+//#define UpPressed()    JoystickPressed(JOYSTICK_UP_PIN)
+//#define DownPressed()  JoystickPressed(JOYSTICK_DOWN_PIN)
+//#define FirePressed()  JoystickPressed(JOYSTICK_FIRE_PIN)
+
 
 // experimental :
 //const uint32_t buttonPIN[7] = {USER_BUTTON_PIN, MODE_BUTTON_PIN, JOYSTICK_UP_PIN, JOYSTICK_DOWN_PIN, JOYSTICK_LEFT_PIN, JOYSTICK_RIGHT_PIN, JOYSTICK_FIRE_PIN};
@@ -170,10 +186,12 @@ void confUSART() {
 
 void GPIOconfButton(GPIO_TypeDef *const gpio, uint32_t pin) {
     // TODO czym sie to rozni od GPIOinConfigure i ktorego uzwac
-    GPIOainConfigure(gpio, pin);
-//                    ?,   // GPIOPuPd_TypeDef pull,
-//                    ?,   // EXTIMode_TypeDef mode,
-//                    ?    // EXTITrigger_TypeDef trigger);
+//    GPIOainConfigure(gpio, pin); // to nie dziala
+    GPIOinConfigure(gpio, pin,
+                    GPIO_PuPd_NOPULL,   // GPIOPuPd_TypeDef pull, // todo co to oznacza
+                    EXTI_Mode_Event,   // EXTIMode_TypeDef mode,
+                    EXTI_Trigger_Irrelevant    // EXTITrigger_TypeDef trigger);
+    );
 }
 
 void confButtons() {
@@ -181,6 +199,12 @@ void confButtons() {
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN |
                     RCC_AHB1ENR_GPIOBEN |
                     RCC_AHB1ENR_GPIOCEN;
+
+    // todo spytac czy musze to robic tak jak resetowalem LEDy
+    USER_BUTTON_GPIO->BSRRH = 1 << USER_BUTTON_PIN;
+    JOYSTICK_GPIO->BSRRL = (1 << JOYSTICK_UP_PIN) | (1 << JOYSTICK_DOWN_PIN) | (1 << JOYSTICK_LEFT_PIN) |
+            (1 << JOYSTICK_RIGHT_PIN) | (1 << JOYSTICK_FIRE_PIN);
+    MODE_BUTTON_GPIO->BSRRH = 1 << MODE_BUTTON_PIN;
 
     GPIOconfButton(USER_BUTTON_GPIO, USER_BUTTON_PIN);
 
@@ -192,13 +216,6 @@ void confButtons() {
 
     GPIOconfButton(MODE_BUTTON_GPIO, MODE_BUTTON_PIN);
 }
-
-// i'th bit says what was previous pressed/released state of a button with pin i,
-// we can rely on it as long as pins  for buttons are unique
-int BUTTON_STATE = 0;
-#define prevButtonState(pin) (BUTTON_STATE & (1<<pin))
-#define hasButtonStateChanged(pin, is_active) ((prevButtonState(pin) == 0) != (is_active == 0))
-#define revertButtonState(pin) (BUTTON_STATE ^= (1<<pin))
 
 // ============================= UTILS ===============================
 
@@ -228,7 +245,7 @@ void putcActiveWait(char c) {
 	USART2->DR = c;
 }
 
-void uartPuts(char c) {
+void uartPutc(char c) {
     USART2->DR = c;
 }
 
@@ -237,10 +254,17 @@ void uartPuts(char c) {
 
 #define Q_SIZE 50
 
+#include <stdio.h>
+#include <string.h>
+
 typedef struct {
     char buf[Q_SIZE];
     int begin, end;
 } Que;
+
+int clear(Que *q) {
+    q->begin = q->end = 0;
+}
 
 int available(const Que *q) {
 
@@ -258,28 +282,42 @@ bool isFull(const Que *q) {
 //    return
 }
 
-bool startsWith(const Que *q, char* str, int len) {
-
+bool startsWith(const Que *q, char* str) {
+    int len = strlen(str);
+    return 0;
 }
 
 void pushChar(Que *q, char c) {
 
 }
 
-void pushStr(Que *q, char* command, int len) {
+void pushStr(Que *q, char* command) {
     // len x pushChar
 }
 
 
 char popFront(Que *q) {
-
+    return ' ';
 }
 
 // returns true if found
-bool removeIfEqual(const Que *q, char* str, int len) {
+bool popFrontIfEqual(const Que *q, char *str) {
     // combine startsWith and len x popFront
 }
 
+void buttonChange(GPIO_TypeDef * gpio, uint32_t pin, int active, char* name, Que *q) {
+    if (HasButtonChanged(gpio, pin, active)) {
+        pushStr(q, name);
+        if (IsButtonPressed(gpio, pin, active)) {
+            pushStr(q, " PRESSED\n");
+            putcActiveWait('P');
+        } else {
+            pushStr(q, " RELEASED\n");
+            putcActiveWait('R');
+        }
+        RevertButtonState(pin);
+    }
+}
 
 int main() {
 	confUSART();
@@ -288,6 +326,8 @@ int main() {
 
     Que out_q;
     Que in_q;
+    clear(&out_q);
+    clear(&in_q);
 
     // todo implement for
     // implement buttons, write whatever to console, keep leds blinkig
@@ -296,22 +336,51 @@ int main() {
     // implement leds
 
 	for (;;) {
-		RedLEDon();
-		Delay(4000000);
 
-        putcActiveWait('a');
+        if (HAS_NEXT_CHAR) {
+            char c = uartGetc();
+            pushChar(&in_q, c);
+        }
 
-		RedLEDoff();
+        if (!isEmpty(&in_q)) {
+            if (popFrontIfEqual(&in_q, "LED 1 ON")) {
+                RedLEDon();
+            } else if (popFrontIfEqual(&in_q, "LED 1 OFF")) {
+                RedLEDoff();
+            } else if (popFrontIfEqual(&in_q, "LED 1 TOGGLE")) {
+                RedLEDtoggle();
+            } else if (popFrontIfEqual(&in_q, "LED 2 ON")) {
+                GreenLEDon();
+            } else if (popFrontIfEqual(&in_q, "LED 2 OFF")) {
+                GreenLEDoff();
+            } else if (popFrontIfEqual(&in_q, "LED 2 TOGGLE")) {
+                GreenLEDtoggle();
+            } else if (popFrontIfEqual(&in_q, "LED 3 ON")) {
+                BlueLEDon();
+            } else if (popFrontIfEqual(&in_q, "LED 3 OFF")) {
+                BlueLEDoff();
+            } else if (popFrontIfEqual(&in_q, "LED 3 TOGGLE")) {
+                BlueLEDtoggle();
+            } else if (popFrontIfEqual(&in_q, "LED 4 ON")) {
+                Green2LEDon();
+            } else if (popFrontIfEqual(&in_q, "LED 4 OFF")) {
+                Green2LEDoff();
+            } else if (popFrontIfEqual(&in_q, "LED 4 TOGGLE")) {
+                Green2LEDtoggle();
+            }
+        }
 
-		GreenLEDon();
-		Delay(4000000);
-		GreenLEDoff();
-		BlueLEDon();
-		Delay(4000000);
-		BlueLEDoff();
-		//Green2LEDon();
-		//Delay(4000000);
-		//Green2LEDoff();
+        buttonChange(MODE_BUTTON_GPIO, MODE_BUTTON_PIN, MODE_BUTTON_ACTIVE, "MODE", &out_q);
+        buttonChange(USER_BUTTON_GPIO, USER_BUTTON_PIN, USER_BUTTON_ACTIVE, "USER", &out_q);
+        buttonChange(JOYSTICK_GPIO, JOYSTICK_UP_PIN, JOYSTICK_ACTIVE, "UP", &out_q);
+        buttonChange(JOYSTICK_GPIO, JOYSTICK_DOWN_PIN, JOYSTICK_ACTIVE, "DOWN", &out_q);
+        buttonChange(JOYSTICK_GPIO, JOYSTICK_LEFT_PIN, JOYSTICK_ACTIVE, "LEFT", &out_q);
+        buttonChange(JOYSTICK_GPIO, JOYSTICK_RIGHT_PIN, JOYSTICK_ACTIVE, "RIGHT", &out_q);
+        buttonChange(JOYSTICK_GPIO, JOYSTICK_FIRE_PIN, JOYSTICK_ACTIVE, "FIRE", &out_q);
+
+        if (!isEmpty(&out_q)) {
+            uartPutc(popFront(&out_q));
+        }
 	}
 
 	return 0;
