@@ -23,15 +23,15 @@
 
 #define GreenLEDon() GREEN_LED_GPIO->BSRRH = 1 << GREEN_LED_PIN
 #define GreenLEDoff() GREEN_LED_GPIO->BSRRL = 1 << GREEN_LED_PIN
-#define GreenLEDtoggle() GREEN_LED_GPIO->ODR ^= 1 << RED_LED_PIN
+#define GreenLEDtoggle() GREEN_LED_GPIO->ODR ^= 1 << GREEN_LED_PIN
 
 #define BlueLEDon() BLUE_LED_GPIO->BSRRH = 1 << BLUE_LED_PIN
 #define BlueLEDoff() BLUE_LED_GPIO->BSRRL = 1 << BLUE_LED_PIN
-#define BlueLEDtoggle() BLUE_LED_GPIO->ODR ^= 1 << RED_LED_PIN
+#define BlueLEDtoggle() BLUE_LED_GPIO->ODR ^= 1 << BLUE_LED_PIN
 
 #define Green2LEDon() GREEN2_LED_GPIO->BSRRL = 1 << GREEN2_LED_PIN
 #define Green2LEDoff() GREEN2_LED_GPIO->BSRRH = 1 << GREEN2_LED_PIN
-#define Green2LEDtoggle() GREEN2_LED_GPIO->ODR ^= 1 << RED_LED_PIN
+#define Green2LEDtoggle() GREEN2_LED_GPIO->ODR ^= 1 << GREEN2_LED_PIN
 
 
 void GPIOconfLED(GPIO_TypeDef * const gpio, uint32_t pin) {
@@ -222,7 +222,6 @@ void confButtons() {
 #define CAN_WRITE (USART2->SR & USART_SR_TXE)
 #define HAS_NEXT_CHAR (USART2->SR & USART_SR_RXNE)
 
-
 char getcActiveWait() {
 	for (;!HAS_NEXT_CHAR;) {
 		__NOP();
@@ -232,17 +231,17 @@ char getcActiveWait() {
     return c;
 }
 
+void putcActiveWait(char c) {
+    for (;!CAN_WRITE;) {
+        __NOP();
+    }
+    USART2->DR = c;
+}
+
 char uartGetc() {
     char c;
     c = USART2->DR;
     return c;
-}
-
-void putcActiveWait(char c) {
-	for (;!CAN_WRITE;) {
-		__NOP();
-	}
-	USART2->DR = c;
 }
 
 void uartPutc(char c) {
@@ -316,6 +315,9 @@ bool pushStr(Que *q, char* command) {
 }
 
 char popFront(Que *q) {
+    if (size(q) == 0) {
+        return ' ';
+    }
     int j = q->begin;
     char c = q->buf[j];
     q->begin = (j + 1) % Q_SIZE;
@@ -336,15 +338,16 @@ void buttonChange(GPIO_TypeDef * gpio, uint32_t pin, int active, char* name, Que
     if (HasButtonChanged(gpio, pin, active)) {
         pushStr(q, name);
         if (IsButtonPressed(gpio, pin, active)) {
-            pushStr(q, " PRESSED\n");
-            putcActiveWait('P');
+            pushStr(q, " PRESSED ");
+//            putcActiveWait('P');
         } else {
-            pushStr(q, " RELEASED\n");
-            putcActiveWait('R');
+            pushStr(q, " RELEASED ");
+//            putcActiveWait('R');
         }
         RevertButtonState(pin);
     }
 }
+
 
 int main() {
 	confUSART();
@@ -356,22 +359,16 @@ int main() {
     clear(&out_q);
     clear(&in_q);
 
-    // todo implement for
-    // implement buttons, write whatever to console, keep leds blinkig
-    // implement out
-    // implement in
-    // implement leds
 
 	for (;;) {
-
-        if (HAS_NEXT_CHAR) {
+        if (HAS_NEXT_CHAR && available(&in_q) > 0 ) {
             char c = uartGetc();
             pushChar(&in_q, c);
+            pushChar(&out_q, c); // to see in console what typing
         }
 
         if (!isEmpty(&in_q)) {
             popFrontIfEqual(&in_q, " ");
-//            popFrontIfEqual(&in_q, "\n");
 
             if (popFrontIfEqual(&in_q, "LED 1 ON")) {
                 RedLEDon();
@@ -408,7 +405,7 @@ int main() {
         buttonChange(JOYSTICK_GPIO, JOYSTICK_RIGHT_PIN, JOYSTICK_ACTIVE, "RIGHT", &out_q);
         buttonChange(JOYSTICK_GPIO, JOYSTICK_FIRE_PIN, JOYSTICK_ACTIVE, "FIRE", &out_q);
 
-        if (!isEmpty(&out_q)) {
+        if (!isEmpty(&out_q) && CAN_WRITE) {
             uartPutc(popFront(&out_q));
         }
 	}
