@@ -3,6 +3,7 @@
 #include <stm32.h>
 // TODO remove! added only to support functions and macros recognition in IDE
 #include <stm32f411xe.h>
+#include <stdbool.h>
 
 
 // ============================ LEDY ===================================
@@ -167,6 +168,7 @@ void confUSART() {
 
 
 void confInput(GPIO_TypeDef * const gpio, uint32_t pin) {
+    // TODO czym sie to rozni od GPIOinConfigure i ktorego uzwac
     GPIOainConfigure(gpio, pin);
 //                    ?,   // GPIOPuPd_TypeDef pull,
 //                    ?,   // EXTIMode_TypeDef mode,
@@ -213,6 +215,12 @@ char getcActiveWait() {
     return c;
 }
 
+char uartGetc() {
+    char c;
+    c = USART2->DR;
+    return c;
+}
+
 void putcActiveWait(char c) {
 	for (;!CAN_WRITE;) {
 		__NOP();
@@ -220,13 +228,77 @@ void putcActiveWait(char c) {
 	USART2->DR = c;
 }
 
+void uartPuts(char c) {
+    USART2->DR = c;
+}
 
+
+// ====================== SIMPLE QUE IMPLEMENTATION =========================
+
+#define Q_SIZE 50
+
+typedef struct {
+    char buf[Q_SIZE];
+    int begin, end;
+} Que;
+
+Que out_q;
+Que in_q;
+
+
+int available(const Que *q) {
+
+}
+
+int size(const Que *q) {
+
+}
+
+bool isEmpty(const Que *q) {
+    return q->begin == q->end;
+}
+
+bool isFull(const Que *q) {
+//    return
+}
+
+bool startsWith(const Que *q, char* str, int len) {
+
+}
+
+void pushChar(Que *q, char c) {
+
+}
+
+void pushStr(Que *q, char* command, int len) {
+    // len x pushChar
+}
+
+
+char popFront(Que *q) {
+
+}
+
+// returns true if found
+bool removeIfEqual(const Que *q, char* str, int len) {
+    // combine startsWith and len x popFront
+}
+
+
+
+#include <stdio.h>
+#include <string.h>
 
 int main() {
 	confUSART();
 	confLED();
     confButtons();
 
+    char tmp[30] = "LED 1 ON\nLED 2 OFF\n";
+
+    if(strncmp(tmp, "LED", 3)) {
+        BlueLEDon();
+    }
 
 	for (;;) {
 		RedLEDon();
